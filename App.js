@@ -1,20 +1,97 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, SafeAreaView, ScrollView, StatusBar, TextInput, Button } from 'react-native';
+import { firestore,collection,addDoc,MESSAGES,serverTimestamp,orderBy } from './firebase/Config';
+import { useEffect, useState } from 'react';
+import { query, onSnapshot } from 'firebase/firestore';
+import { convertFirebaseTimeStampToJS } from './helper/Functions';
+
+
+
 
 export default function App() {
+  const [messages, setMessages] = useState([])
+  const [newMessage, setNewMessage] = useState('')
+
+  const save = async() => {
+    try {
+    const docRef = await addDoc(collection(firestore, MESSAGES), {
+      text: newMessage,
+      created: serverTimestamp()
+    });
+    setNewMessage('');
+    console.log('Message saved with ID: ', docRef.id);
+  } catch (error) {
+    console.error('Error saving message: ', error);
+  }
+}
+useEffect(() => {
+  const q = query(collection(firestore,MESSAGES),orderBy('created','desc'))
+
+  const unsubscribe = onSnapshot(q,(querySnapshot) => {
+    const tempMessages = []
+
+    querySnapshot.forEach((doc) => {
+      const messageObject = {
+        id: doc.id,
+        text: doc.data().text,
+        created: convertFirebaseTimeStampToJS(doc.data().created)
+      }
+      tempMessages.push(messageObject)
+    })
+    setMessages(tempMessages)
+  })
+
+  return () => {
+    unsubscribe()
+  }
+  }, []);
+
+
+  /*vanha viestien lisäys metodi appiin
   return (
     <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
+      <TextInput placeholder='Send message...' value={newMessage} onChangeText={text => setNewMessage(text)}/>
+      <Button title="Send" type="button" onPress={save} />
     </View>
-  );
-}
+  );*/
+
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView>
+          {
+            messages.map((message) => (
+              <View style={styles.message} key={message.id}>
+                <Text style={styles.messageInfo}>{message.created}</Text>
+                <Text>{message.text}</Text>
+                </View>
+            ))
+          }
+          </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+
+
+
 
 const styles = StyleSheet.create({
   container: {
+    paddingTop: StatusBar.currentHeight,
     flex: 1,
     backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
+  message: {
+    padding: 10,
+    marginTop: 10,
+    marginBottom: 10,
+    backgroundColor: '#f5f5f5',
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 5,
+    marginLeft: 10,
+    marginRight: 10,
+  },
+  messageInfo: {
+    fontSize: 12
+  }
 });
